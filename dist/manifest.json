@@ -1,0 +1,19 @@
+{
+  "name": "tokiq — POS untuk UMKM",
+  "short_name": "tokiq",
+  "description": "Platform POS SaaS untuk UMKM Indonesia",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "48x48",
+      "type": "image/x-icon"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "lang": "id"
+}
