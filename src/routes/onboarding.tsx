@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -41,11 +41,18 @@ const STEPS = [
 ]
 
 function OnboardingPage() {
-  const { user, authUser } = useAuth()
+  const { user, authUser, refreshAuthUser } = useAuth()
   const navigate = useNavigate()
   const [currentStep, setCurrentStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [, setTenantId] = useState<string | null>(authUser?.tenantId ?? null)
+
+  // Kalau sudah punya tenant (misal refresh halaman), skip ke step 4
+  useEffect(() => {
+    if (authUser?.tenantId && currentStep === 1) {
+      setCurrentStep(4)
+    }
+  }, [authUser?.tenantId])
 
   const step1Form = useForm<Step1Values>({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -70,6 +77,8 @@ function OnboardingPage() {
         phone: values.phone,
       })
       setTenantId(tenant.id)
+      // Refresh authUser agar tenantId tersedia sebelum navigasi
+      await refreshAuthUser()
       setCurrentStep(2)
     } catch (err) {
       toast.error(`Gagal menyimpan: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -78,7 +87,9 @@ function OnboardingPage() {
     }
   }
 
-  function handleSkipToApp() {
+  async function handleSkipToApp() {
+    // Refresh dulu agar /app layout tidak throw karena tenantId null
+    await refreshAuthUser()
     navigate({ to: '/app/dashboard' })
   }
 

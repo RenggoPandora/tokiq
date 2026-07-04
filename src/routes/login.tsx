@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate, Link } from '@tanstack/react-router'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useEffect } from 'react'
 import { ShoppingCart, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useAuth } from '@/contexts/auth.context'
@@ -15,7 +16,7 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-  const { signIn, authUser } = useAuth()
+  const { signIn, authUser, isLoading } = useAuth()
   const navigate = useNavigate()
 
   const form = useForm<LoginFormValues>({
@@ -23,26 +24,33 @@ function LoginPage() {
     defaultValues: { email: '', password: '' },
   })
 
+  // Redirect SETELAH render selesai — pakai useEffect bukan render langsung
+  useEffect(() => {
+    if (!authUser) return
+    if (authUser.isSuperAdmin) {
+      navigate({ to: '/admin' })
+    } else if (authUser.tenantId) {
+      // Sudah punya tenant → langsung ke dashboard
+      navigate({ to: '/app/dashboard' })
+    } else {
+      // Sudah login tapi belum punya tenant → ke onboarding
+      navigate({ to: '/onboarding' })
+    }
+  }, [authUser, navigate])
+
   async function onSubmit(values: LoginFormValues) {
     try {
       await signIn(values.email, values.password)
-      // Redirect berdasarkan role
-      // authUser akan diupdate setelah signIn — beri sedikit waktu
       toast.success('Berhasil masuk!')
+      // redirect ditangani useEffect di atas
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Gagal masuk'
       toast.error(message)
     }
   }
 
-  // Redirect setelah auth state berubah
-  if (authUser) {
-    if (authUser.isSuperAdmin) {
-      navigate({ to: '/admin' })
-    } else if (authUser.tenantId) {
-      navigate({ to: '/app/dashboard' })
-    }
-  }
+  // Jangan render form kalau authUser sudah ada (sedang redirect)
+  if (isLoading) return null
 
   return (
     <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">

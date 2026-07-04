@@ -9,7 +9,7 @@ VALUES
   (
     'Starter', 
     149000, 
-    1490000, -- 10 months if paid yearly (discount)
+    1490000,
     14, 
     true, 
     '{
@@ -25,12 +25,12 @@ VALUES
   (
     'Pro', 
     299000, 
-    2990000, -- 10 months if paid yearly (discount)
+    2990000,
     14, 
     true, 
     '{
-      "branches_limit": -1, -- unlimited
-      "cashiers_limit": -1, -- unlimited
+      "branches_limit": -1,
+      "cashiers_limit": -1,
       "pos_features": true,
       "basic_reports": true,
       "advanced_reports": true,

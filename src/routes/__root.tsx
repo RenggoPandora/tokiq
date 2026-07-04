@@ -31,9 +31,24 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       throw redirect({ to: '/login' })
     }
 
-    // Kalau sudah login dan akses auth pages, redirect ke app
+    // Kalau sudah login dan akses auth pages, cek apakah sudah punya tenant
     if (session && (pathname === '/login' || pathname === '/register')) {
-      throw redirect({ to: '/app/dashboard' })
+      const { data: tenantUserData } = await supabase
+        .from('tenant_users')
+        .select('tenant_id')
+        .eq('user_id', session.user.id)
+        .eq('is_active', true)
+        .maybeSingle()
+
+      const tenantUser = tenantUserData as { tenant_id: string } | null
+
+      if (tenantUser?.tenant_id) {
+        // Sudah punya tenant → langsung ke dashboard
+        throw redirect({ to: '/app/dashboard' })
+      } else {
+        // Belum punya tenant → onboarding
+        throw redirect({ to: '/onboarding' })
+      }
     }
   },
   component: RootLayout,

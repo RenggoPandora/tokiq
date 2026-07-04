@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
@@ -44,6 +44,7 @@ function AdminTenantsPage() {
     type: 'suspend' | 'activate' | 'extend'
     tenant: TenantWithPlan
   } | null>(null)
+  const navigate = useNavigate()
 
   const { data: tenants, isLoading } = useAdminTenants({
     search: search || undefined,
@@ -127,11 +128,11 @@ function AdminTenantsPage() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem asChild>
-                <Link to="/admin/tenants/$tenantId" params={{ tenantId: t.id }}>
-                  <ExternalLink className="mr-2 h-3.5 w-3.5" />
-                  Lihat Detail
-                </Link>
+              <DropdownMenuItem
+                onClick={() => navigate({ to: '/admin/tenants/$tenantId', params: { tenantId: t.id } })}
+              >
+                <ExternalLink className="mr-2 h-3.5 w-3.5" />
+                Lihat Detail
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               {t.status === TENANT_STATUS.TRIAL && (

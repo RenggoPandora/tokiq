@@ -17,6 +17,7 @@ interface AuthContextValue {
   signUp: (email: string, password: string, metadata?: Record<string, unknown>) => Promise<void>
   signOut: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  refreshAuthUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -142,6 +143,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error
   }
 
+  // Paksa reload authUser dari DB — dipanggil setelah onboarding selesai
+  async function refreshAuthUser() {
+    const { data: { user: currentUser } } = await supabase.auth.getUser()
+    if (currentUser) {
+      const au = await loadAuthUser(currentUser)
+      setAuthUser(au)
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -154,6 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         resetPassword,
+        refreshAuthUser,
       }}
     >
       {children}

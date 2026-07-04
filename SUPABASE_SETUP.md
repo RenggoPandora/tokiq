@@ -193,29 +193,35 @@ END;
 $$;
 ```
 
-### 4.2 Fungsi Upsert Stok (untuk stok opname)
+### 4.2 Fungsi Upsert Stok (untuk stok opname) (4.3 dulu)
 
 ```sql
 CREATE OR REPLACE FUNCTION upsert_stock(
-  p_tenant_id UUID,
-  p_branch_id UUID,
+  p_tenant_id  UUID,
+  p_branch_id  UUID,
   p_product_id UUID,
   p_variant_id UUID,
-  p_quantity INTEGER
+  p_quantity   INTEGER
 )
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
-  INSERT INTO stocks (tenant_id, branch_id, product_id, variant_id, quantity, updated_at)
-  VALUES (p_tenant_id, p_branch_id, p_product_id, p_variant_id, p_quantity, NOW())
-  ON CONFLICT (product_id, variant_id, branch_id)
-  DO UPDATE SET 
-    quantity = EXCLUDED.quantity,
-    updated_at = NOW();
+  IF p_variant_id IS NOT NULL THEN
+    INSERT INTO stocks (tenant_id, branch_id, product_id, variant_id, quantity, updated_at)
+    VALUES (p_tenant_id, p_branch_id, p_product_id, p_variant_id, p_quantity, NOW())
+    ON CONFLICT ON CONSTRAINT stocks_unique_with_variant
+    DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW();
+  ELSE
+    INSERT INTO stocks (tenant_id, branch_id, product_id, variant_id, quantity, updated_at)
+    VALUES (p_tenant_id, p_branch_id, p_product_id, NULL, p_quantity, NOW())
+    ON CONFLICT ON CONSTRAINT stocks_unique_without_variant
+    DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = NOW();
+  END IF;
 END;
 $$;
+
 ```
 
 ### 4.3 Perbaiki UNIQUE constraint untuk variant NULL
@@ -441,7 +447,7 @@ WHERE table_schema = 'public'
 ORDER BY table_name;
 ```
 
-Hasil yang diharapkan — harus ada 22 tabel:
+Hasil yang diharapkan — harus ada 21 tabel:
 ```
 branches, cash_movements, categories, customers, discounts,
 invoices, product_addons, product_prices, product_variants, products,

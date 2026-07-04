@@ -42,9 +42,19 @@ export const Route = createFileRoute('/app/staff')({
 const staffSchema = z.object({
   name: z.string().min(1, 'Nama staff wajib diisi').max(100),
   role: z.enum(['owner', 'manager', 'cashier', 'warehouse']),
+  email: z.string().email('Email tidak valid'),
+  password: z.string().min(8, 'Password minimal 8 karakter'),
   pin: z.string().length(6, 'PIN harus 6 digit').regex(/^\d+$/, 'PIN harus angka').optional().or(z.literal('')),
 })
+
+const staffEditSchema = z.object({
+  name: z.string().min(1, 'Nama staff wajib diisi').max(100),
+  role: z.enum(['owner', 'manager', 'cashier', 'warehouse']),
+  pin: z.string().length(6, 'PIN harus 6 digit').regex(/^\d+$/, 'PIN harus angka').optional().or(z.literal('')),
+})
+
 type StaffFormValues = z.infer<typeof staffSchema>
+type StaffEditFormValues = z.infer<typeof staffEditSchema>
 
 const ROLE_LABELS: Record<string, string> = {
   owner: 'Owner',

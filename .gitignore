@@ -5,3 +5,10 @@
 # React Router
 /.react-router/
 /build/
+.env.local
+supabase/migrations/003_seed_plans.sql
+supabase/migrations/002_rls_policies.sql
+supabase/migrations/001_init_schema.sql
+SUPABASE_SETUP.md
+.env.local
+supabase/migrations/003_seed_plans.sql
