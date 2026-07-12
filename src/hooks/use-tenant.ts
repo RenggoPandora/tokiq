@@ -1,10 +1,11 @@
-import { useAuth } from '@/contexts/auth.context'
+﻿import { useAuth } from '@/contexts/auth.context'
 import type { Tenant, TenantUser } from '@/types/app.types'
 
 interface UseTenantReturn {
   tenantId: string
   tenant: Tenant
   tenantUser: TenantUser
+  branchId: string | null
   role: string
   isOwner: boolean
   isManager: boolean
@@ -28,11 +29,13 @@ export function useTenant(): UseTenantReturn {
   }
 
   const role = authUser.tenantUser.role
+  const branchId = authUser.tenantUser.branch_id
 
   return {
     tenantId: authUser.tenantId,
     tenant: authUser.tenant,
     tenantUser: authUser.tenantUser,
+    branchId, // null untuk owner, specific branch untuk staff
     role,
     isOwner: role === 'owner',
     isManager: role === 'manager' || role === 'owner',

@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+﻿import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import { AlertTriangle, Package, Pencil, Loader2 } from 'lucide-react'
@@ -69,7 +69,7 @@ function StockPage() {
           </div>
           <div>
             <p className="font-medium text-sm text-foreground">
-              {row.original.products?.name ?? '—'}
+              {row.original.products?.name ?? 'â€”'}
             </p>
             {row.original.products?.sku && (
               <p className="text-xs text-muted-foreground">SKU: {row.original.products.sku}</p>
@@ -79,6 +79,15 @@ function StockPage() {
       ),
     },
     {
+      accessorKey: 'branches',
+      header: 'Cabang',
+      cell: ({ row }) => (
+        <span className="text-sm text-muted-foreground">
+          {row.original.branches?.name ?? 'Default'}
+        </span>
+      ),
+    },
+          {
       accessorKey: 'quantity',
       header: 'Stok',
       cell: ({ row }) => {
@@ -186,7 +195,7 @@ function StockPage() {
               className="space-y-4"
             >
               <div className="bg-muted/50 rounded-lg p-3">
-                <p className="text-sm font-medium">{adjustTarget.products?.name ?? '—'}</p>
+                <p className="text-sm font-medium">{adjustTarget.products?.name ?? 'â€”'}</p>
                 <p className="text-xs text-muted-foreground">
                   Stok saat ini: <strong>{adjustTarget.quantity}</strong>
                 </p>
@@ -234,3 +243,5 @@ function StockPage() {
     </div>
   )
 }
+
+

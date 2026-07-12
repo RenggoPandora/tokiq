@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+﻿import { createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
 import { type ColumnDef } from '@tanstack/react-table'
 import {
@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select'
 import { staffService } from '@/services/staff.service'
 import { useTenant } from '@/hooks/use-tenant'
+import { useBranches } from '@/hooks/use-branches'
 import type { TenantUser } from '@/types/app.types'
 
 export const Route = createFileRoute('/app/staff')({
@@ -42,9 +43,17 @@ export const Route = createFileRoute('/app/staff')({
 const staffSchema = z.object({
   name: z.string().min(1, 'Nama staff wajib diisi').max(100),
   role: z.enum(['owner', 'manager', 'cashier', 'warehouse']),
+  branchId: z.string().min(1, 'Cabang wajib dipilih').optional(),
   email: z.string().email('Email tidak valid'),
   password: z.string().min(8, 'Password minimal 8 karakter'),
   pin: z.string().length(6, 'PIN harus 6 digit').regex(/^\d+$/, 'PIN harus angka').optional().or(z.literal('')),
+}).refine((data) => {
+  // Owner tidak perlu branch_id, role lain wajib
+  if (data.role !== 'owner' && !data.branchId) return false
+  return true
+}, {
+  message: 'Cabang wajib dipilih untuk role selain Owner',
+  path: ['branchId'],
 })
 
 const staffEditSchema = z.object({
@@ -64,7 +73,8 @@ const ROLE_LABELS: Record<string, string> = {
 }
 
 function StaffPage() {
-  const { tenantId } = useTenant()
+  const { tenantId, tenantUser, branchId, isOwner } = useTenant()
+  const { data: branches } = useBranches()
   const queryClient = useQueryClient()
 
   const { data: staff, isLoading } = useQuery({
@@ -74,9 +84,17 @@ function StaffPage() {
   })
 
   const createStaff = useMutation({
-    mutationFn: (dto: Parameters<typeof staffService.create>[0]) => staffService.create(dto),
+    mutationFn: ({ 
+      dto, 
+      email, 
+      password 
+    }: { 
+      dto: Parameters<typeof staffService.createWithAuth>[0]; 
+      email: string; 
+      password: string 
+    }) => staffService.createWithAuth(dto, email, password),
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['staff', tenantId] }); toast.success('Staff berhasil ditambahkan') },
-    onError: (err: Error) => toast.error(err.message),
+    onError: (err: Error) => toast.error(err.message || 'Gagal menambahkan staff'),
   })
 
   const updateStaff = useMutation({
@@ -95,7 +113,7 @@ function StaffPage() {
 
   const deleteStaff = useMutation({
     mutationFn: (id: string) => staffService.delete(id),
-    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['staff', tenantId] }); toast.success('Staff berhasil dihapus') },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['staff', tenantId] }); toast.success('Staff berhasil dinonaktifkan') },
     onError: (err: Error) => toast.error(err.message),
   })
 
@@ -104,20 +122,21 @@ function StaffPage() {
   const [deleteTarget, setDeleteTarget] = useState<TenantUser | null>(null)
 
   const form = useForm<StaffFormValues>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    resolver: zodResolver(staffSchema) as any,
-    defaultValues: { name: '', role: 'cashier', pin: '' },
+    resolver: zodResolver(editTarget ? staffEditSchema : staffSchema) as any,
+    defaultValues: { name: '', role: '' as any, branchId: '', email: '', password: '', pin: '' },
   })
 
   function openCreate() {
     setEditTarget(null)
-    form.reset({ name: '', role: 'cashier', pin: '' })
+    // Manager otomatis assign staff ke cabang mereka sendiri
+    const defaultBranchId = isOwner ? '' : (branchId || '')
+    form.reset({ name: '', role: '' as any, branchId: defaultBranchId, email: '', password: '', pin: '' })
     setOpenForm(true)
   }
 
   function openEdit(s: TenantUser) {
     setEditTarget(s)
-    form.reset({ name: s.name, role: s.role as StaffFormValues['role'], pin: '' })
+    form.reset({ name: s.name, role: s.role as StaffFormValues['role'], email: '', password: '', pin: '' })
     setOpenForm(true)
   }
 
@@ -131,12 +150,16 @@ function StaffPage() {
     if (editTarget) {
       await updateStaff.mutateAsync({ id: editTarget.id, dto })
     } else {
-      await createStaff.mutateAsync({
-        ...dto,
-        tenant_id: tenantId,
-        user_id: null,
-        branch_id: null,
-        permissions: null,
+      await createStaff.mutateAsync({ 
+        dto: { 
+          ...dto, 
+          tenant_id: tenantId, 
+          user_id: null, 
+          branch_id: values.branchId || null, 
+          permissions: null 
+        },
+        email: values.email,
+        password: values.password,
       })
     }
     setOpenForm(false)
@@ -147,43 +170,48 @@ function StaffPage() {
       accessorKey: 'name',
       header: 'Nama',
       cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center shrink-0 text-xs font-bold text-muted-foreground">
-            {row.original.name.charAt(0).toUpperCase()}
-          </div>
-          <div>
-            <p className="font-medium text-sm">{row.original.name}</p>
-            {!row.original.is_active && (
-              <p className="text-xs text-muted-foreground">Nonaktif</p>
-            )}
-          </div>
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium">{row.original.name}</span>
+          {row.original.user_id && (
+            <span className="text-xs text-muted-foreground">Terhubung dengan Auth</span>
+          )}
         </div>
       ),
     },
     {
       accessorKey: 'role',
       header: 'Role',
-      cell: ({ row }) => (
-        <Badge variant={row.original.role === 'owner' ? 'default' : 'secondary'}>
-          {ROLE_LABELS[row.original.role] ?? row.original.role}
-        </Badge>
-      ),
+      cell: ({ row }) => <Badge variant="outline">{ROLE_LABELS[row.original.role]}</Badge>,
+    },
+    {
+      accessorKey: 'branch_id',
+      header: 'Cabang',
+      cell: ({ row }) => {
+        if (row.original.role === 'owner') {
+          return <Badge variant="secondary">Semua Cabang</Badge>
+        }
+        const branch = branches?.find((b) => b.id === row.original.branch_id)
+        return (
+          <span className="text-sm text-muted-foreground">
+            {branch?.name ?? '—'}
+          </span>
+        )
+      },
     },
     {
       accessorKey: 'is_active',
       header: 'Status',
-      cell: ({ row }) => (
-        <Badge variant={row.original.is_active ? 'default' : 'outline'}>
-          {row.original.is_active ? 'Aktif' : 'Nonaktif'}
-        </Badge>
-      ),
+      cell: ({ row }) =>
+        row.original.is_active ? (
+          <Badge variant="default" className="bg-green-500">Aktif</Badge>
+        ) : (
+          <Badge variant="secondary">Nonaktif</Badge>
+        ),
     },
     {
       id: 'actions',
-      header: '',
       cell: ({ row }) => {
         const s = row.original
-        if (s.role === 'owner') return null
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -204,12 +232,19 @@ function StaffPage() {
                 }
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setDeleteTarget(s)}
-              >
-                <Trash2 className="mr-2 h-3.5 w-3.5" />Hapus
-              </DropdownMenuItem>
+              {s.id === tenantUser.id ? (
+                <DropdownMenuItem disabled className="text-muted-foreground">
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />
+                  Tidak bisa hapus akun sendiri
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDeleteTarget(s)}
+                >
+                  <Trash2 className="mr-2 h-3.5 w-3.5" />Hapus
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         )
@@ -263,19 +298,63 @@ function StaffPage() {
             <div className="space-y-1.5">
               <Label>Role</Label>
               <Select
-                defaultValue={form.getValues('role')}
+                value={form.watch('role')}
                 onValueChange={(v) => form.setValue('role', v as StaffFormValues['role'])}
               >
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Pilih role" /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(ROLE_LABELS)
                     .filter(([v]) => v !== 'owner')
                     .map(([val, label]) => (
                       <SelectItem key={val} value={val}>{label}</SelectItem>
                     ))}
-                </SelectContent>
-              </Select>
+                </SelectContent>              </Select>
             </div>
+            {!editTarget && form.watch('role') !== 'owner' && (
+              <div className="space-y-1.5">
+                <Label>Cabang <span className="text-destructive">*</span></Label>
+                <Select
+                  value={form.watch('branchId')}
+                  onValueChange={(v) => form.setValue('branchId', v)}
+                >
+                  <SelectTrigger disabled={!isOwner}><SelectValue placeholder="Pilih cabang" /></SelectTrigger>
+                  <SelectContent>
+                    {branches?.map((b) => (
+                      <SelectItem key={b.id} value={b.id}>
+                        {b.name} {b.is_main && '(Utama)'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {form.formState.errors.branchId && (
+                  <p className="text-xs text-destructive">{form.formState.errors.branchId.message}</p>
+                )}
+                {!isOwner && branchId && (
+                  <p className="text-xs text-muted-foreground">
+                    Staff akan ditambahkan ke cabang Anda
+                  </p>
+                )}
+              </div>
+            )}
+            {!editTarget && (
+              <>
+                <div className="space-y-1.5">
+                  <Label>Email <span className="text-destructive">*</span></Label>
+                  <Input type="email" placeholder="staff@example.com" {...form.register('email')} />
+                  {form.formState.errors.email && (
+                    <p className="text-xs text-destructive">{form.formState.errors.email.message}</p>
+                  )}
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Password <span className="text-destructive">*</span></Label>
+                  <Input type="password" placeholder="Min 8 karakter" {...form.register('password')} />
+                  {form.formState.errors.password && (
+                    <p className="text-xs text-destructive">{form.formState.errors.password.message}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">Staff akan login dengan email dan password ini.</p>
+                </div>
+              </>
+            )}
             <div className="space-y-1.5">
               <Label>PIN Kasir (6 digit)</Label>
               <Input
@@ -303,9 +382,9 @@ function StaffPage() {
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Hapus staff ini?</AlertDialogTitle>
+            <AlertDialogTitle>Nonaktifkan staff ini?</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{deleteTarget?.name}</strong> akan dihapus dari tim kamu.
+              <strong>{deleteTarget?.name}</strong> akan dinonaktifkan dan tidak bisa login lagi.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -314,7 +393,7 @@ function StaffPage() {
               className="bg-destructive hover:bg-destructive/90"
               onClick={() => { if (deleteTarget) deleteStaff.mutate(deleteTarget.id); setDeleteTarget(null) }}
             >
-              Hapus
+              Nonaktifkan
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

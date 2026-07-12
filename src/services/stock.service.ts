@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/lib/supabase'
 import type { Stock, StockMovement, Supplier, Product } from '@/types/app.types'
 
@@ -10,13 +10,14 @@ const db = supabase as any
 
 export interface StockWithProduct extends Stock {
   products: Pick<Product, 'name' | 'sku' | 'image_url'> | null
+  branches: { name: string } | null
 }
 
 export const stockService = {
   async getAll(tenantId: string, branchId?: string): Promise<StockWithProduct[]> {
     let query = supabase
       .from('stocks')
-      .select('*, products(name, sku, image_url)')
+      .select('*, products(name, sku, image_url), branches(name)')
       .eq('tenant_id', tenantId)
       .order('quantity', { ascending: true })
 
@@ -30,7 +31,7 @@ export const stockService = {
   async getLowStock(tenantId: string): Promise<StockWithProduct[]> {
     const { data, error } = await supabase
       .from('stocks')
-      .select('*, products(name, sku, image_url)')
+      .select('*, products(name, sku, image_url), branches(name)')
       .eq('tenant_id', tenantId)
       .filter('quantity', 'lte', 'min_stock')
       .order('quantity', { ascending: true })
@@ -54,6 +55,7 @@ export const stockService = {
       .eq('tenant_id', tenantId)
       .eq('product_id', productId)
       .eq('branch_id', branchId)
+      .is('variant_id', null)
       .maybeSingle()
 
     if (fetchErr) throw fetchErr
@@ -63,17 +65,19 @@ export const stockService = {
 
     if (diff === 0) return
 
-    // Upsert stock
-    const { error: upsertErr } = await db
+    // Update stock (bukan upsert, karena record sudah ada dari trigger)
+    const { error: updateErr } = await db
       .from('stocks')
-      .upsert({
-        tenant_id: tenantId,
-        product_id: productId,
-        branch_id: branchId,
+      .update({
         quantity: newQty,
         updated_at: new Date().toISOString(),
       })
-    if (upsertErr) throw upsertErr
+      .eq('tenant_id', tenantId)
+      .eq('product_id', productId)
+      .eq('branch_id', branchId)
+      .is('variant_id', null)
+      
+    if (updateErr) throw updateErr
 
     // Log movement
     const { error: movErr } = await db

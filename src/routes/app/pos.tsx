@@ -1,13 +1,14 @@
-import { createFileRoute } from '@tanstack/react-router'
+﻿import { createFileRoute } from '@tanstack/react-router'
 import { useState, useEffect } from 'react'
 import {
   Search, ShoppingCart, Plus, Minus, Trash2, Tag,
   Package, Clock, Scan,
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { useCartStore } from '@/stores/cart.store'
+import { useCartStore, useCartSubtotal, useCartTotal, useCartItemCount } from '@/stores/cart.store'
 import { useShiftStore } from '@/stores/shift.store'
 import { useProducts, useCategories } from '@/hooks/use-products'
+import { useStock } from '@/hooks/use-stock'
 import { useActiveShift, useOpenShift, useCloseShift, useCreateTransaction, useShiftSummary } from '@/hooks/use-pos'
 import { useTenant } from '@/hooks/use-tenant'
 import { branchService } from '@/services/pos.service'
@@ -32,9 +33,16 @@ function PosPage() {
 
   // Cart state
   const {
-    items, subtotal, discountAmount, taxAmount, total, itemCount,
+    items, discount, taxRate,
     addItem, removeItem, updateQty, setDiscount, clearCart,
   } = useCartStore()
+  
+  // Computed values dengan selector hooks (reactive)
+  const subtotal = useCartSubtotal()
+  const total = useCartTotal()
+  const itemCount = useCartItemCount()
+  const discountAmount = discount
+  const taxAmount = Math.round((subtotal - discount) * taxRate)
 
   // Shift state
   const { activeShift, openShift: openShiftStore, closeShift: closeShiftStore } = useShiftStore()
@@ -50,6 +58,7 @@ function PosPage() {
     categoryId: categoryFilter || undefined,
     search: search || undefined,
   })
+  const { data: stocks } = useStock()
 
   // Mutations
   const openShiftMutation = useOpenShift()
@@ -105,6 +114,23 @@ function PosPage() {
   // ===========================
 
   function handleAddProduct(product: ProductWithCategory) {
+    // Check stock availability
+    const stock = stocks?.find(s => s.product_id === product.id)
+    
+    if (!stock || stock.quantity <= 0) {
+      toast.error(`${product.name} stok habis`)
+      return
+    }
+    
+    // Check if adding more than available stock
+    const currentInCart = items.find(i => i.productId === product.id)
+    const currentQty = currentInCart?.quantity ?? 0
+    
+    if (currentQty + 1 > stock.quantity) {
+      toast.error(`Stok ${product.name} hanya tersisa ${stock.quantity}`)
+      return
+    }
+    
     addItem({
       productId: product.id,
       name: product.name,
@@ -239,7 +265,7 @@ function PosPage() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* LEFT — Product Grid */}
+      {/* LEFT â€” Product Grid */}
       <div className="flex-1 flex flex-col overflow-hidden border-r border-border">
         {/* Header */}
         <div className="px-4 py-3 border-b border-border space-y-2">
@@ -316,6 +342,7 @@ function PosPage() {
                 <ProductCard
                   key={product.id}
                   product={product}
+                  stock={stocks?.find(s => s.product_id === product.id)}
                   onAdd={() => handleAddProduct(product)}
                 />
               ))}
@@ -324,7 +351,7 @@ function PosPage() {
         </div>
       </div>
 
-      {/* RIGHT — Cart */}
+      {/* RIGHT â€” Cart */}
       <div className="w-80 xl:w-96 flex flex-col bg-card">
         {/* Cart header */}
         <div className="px-4 py-3 border-b border-border flex items-center justify-between">
@@ -370,6 +397,7 @@ function PosPage() {
               <CartItemRow
                 key={`${item.productId}-${item.variantId}`}
                 item={item}
+                  stock={stocks?.find(s => s.product_id === item.productId)}
                 onUpdateQty={(qty) => updateQty(item.productId, qty, item.variantId)}
                 onRemove={() => removeItem(item.productId, item.variantId)}
               />
@@ -476,16 +504,26 @@ function PosPage() {
 // ===========================
 
 function ProductCard({
-  product, onAdd,
+  product, stock, onAdd,
 }: {
   product: ProductWithCategory
+  stock?: { quantity: number }
   onAdd: () => void
 }) {
+  const isOutOfStock = !stock || stock.quantity <= 0
+  const isLowStock = stock && stock.quantity > 0 && stock.quantity <= 5
+
   return (
     <button
       onClick={onAdd}
-      className="flex flex-col border border-border rounded-lg bg-card p-3 hover:bg-muted/50 active:scale-[0.98] transition-all text-left w-full"
+      disabled={isOutOfStock}
+      className={`flex flex-col border border-border rounded-lg bg-card p-3 hover:bg-muted/50 active:scale-[0.98] transition-all text-left w-full relative ${isOutOfStock ? 'opacity-60 cursor-not-allowed' : ''}`}
     >
+      {isOutOfStock && (
+        <div className="absolute inset-0 bg-black/60 rounded-lg flex items-center justify-center">
+          <span className="text-white text-xs font-bold">HABIS</span>
+        </div>
+      )}
       {product.image_url ? (
         <img
           src={product.image_url}
@@ -500,9 +538,14 @@ function ProductCard({
       <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight mb-1">
         {product.name}
       </p>
-      <p className="text-sm font-bold text-foreground mt-auto">
-        {formatRupiah(product.sell_price)}
-      </p>
+      <div className="flex items-center justify-between mt-auto">
+        <p className="text-sm font-bold text-foreground">
+          {formatRupiah(product.sell_price)}
+        </p>
+        {isLowStock && (
+          <span className="text-[10px] text-amber-600 font-medium">Sisa {stock.quantity}</span>
+        )}
+      </div>
     </button>
   )
 }
@@ -512,9 +555,10 @@ function ProductCard({
 // ===========================
 
 function CartItemRow({
-  item, onUpdateQty,
+  item, stock, onUpdateQty, onRemove,
 }: {
   item: CartItem
+  stock?: { quantity: number }
   onUpdateQty: (qty: number) => void
   onRemove: () => void
 }) {
@@ -528,7 +572,14 @@ function CartItemRow({
         {item.variantName && (
           <p className="text-[10px] text-muted-foreground">{item.variantName}</p>
         )}
-        <p className="text-xs text-muted-foreground">{formatRupiah(lineTotal)}</p>
+        <div className="flex items-center gap-2 text-xs">
+          <span className="text-muted-foreground">{formatRupiah(lineTotal)}</span>
+          {stock && (
+            <span className={`text-[10px] font-medium ${stock.quantity <= 5 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+              Sisa: {stock.quantity}
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
         <button

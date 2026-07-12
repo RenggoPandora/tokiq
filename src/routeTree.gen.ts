@@ -19,6 +19,8 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppSuppliersRouteImport } from './routes/app/suppliers'
+import { Route as AppStock_updatedRouteImport } from './routes/app/stock_updated'
+import { Route as AppStock_originalRouteImport } from './routes/app/stock_original'
 import { Route as AppStockRouteImport } from './routes/app/stock'
 import { Route as AppStaffRouteImport } from './routes/app/staff'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
@@ -85,6 +87,16 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
 const AppSuppliersRoute = AppSuppliersRouteImport.update({
   id: '/suppliers',
   path: '/suppliers',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStock_updatedRoute = AppStock_updatedRouteImport.update({
+  id: '/stock_updated',
+  path: '/stock_updated',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStock_originalRoute = AppStock_originalRouteImport.update({
+  id: '/stock_original',
+  path: '/stock_original',
   getParentRoute: () => AppRoute,
 } as any)
 const AppStockRoute = AppStockRouteImport.update({
@@ -198,6 +210,8 @@ export interface FileRoutesByFullPath {
   '/app/settings': typeof AppSettingsRoute
   '/app/staff': typeof AppStaffRoute
   '/app/stock': typeof AppStockRoute
+  '/app/stock_original': typeof AppStock_originalRoute
+  '/app/stock_updated': typeof AppStock_updatedRoute
   '/app/suppliers': typeof AppSuppliersRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tenants/$tenantId': typeof AdminTenantsTenantIdRoute
@@ -226,6 +240,8 @@ export interface FileRoutesByTo {
   '/app/settings': typeof AppSettingsRoute
   '/app/staff': typeof AppStaffRoute
   '/app/stock': typeof AppStockRoute
+  '/app/stock_original': typeof AppStock_originalRoute
+  '/app/stock_updated': typeof AppStock_updatedRoute
   '/app/suppliers': typeof AppSuppliersRoute
   '/admin': typeof AdminIndexRoute
   '/admin/tenants/$tenantId': typeof AdminTenantsTenantIdRoute
@@ -256,6 +272,8 @@ export interface FileRoutesById {
   '/app/settings': typeof AppSettingsRoute
   '/app/staff': typeof AppStaffRoute
   '/app/stock': typeof AppStockRoute
+  '/app/stock_original': typeof AppStock_originalRoute
+  '/app/stock_updated': typeof AppStock_updatedRoute
   '/app/suppliers': typeof AppSuppliersRoute
   '/admin/': typeof AdminIndexRoute
   '/admin/tenants/$tenantId': typeof AdminTenantsTenantIdRoute
@@ -287,6 +305,8 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/staff'
     | '/app/stock'
+    | '/app/stock_original'
+    | '/app/stock_updated'
     | '/app/suppliers'
     | '/admin/'
     | '/admin/tenants/$tenantId'
@@ -315,6 +335,8 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/staff'
     | '/app/stock'
+    | '/app/stock_original'
+    | '/app/stock_updated'
     | '/app/suppliers'
     | '/admin'
     | '/admin/tenants/$tenantId'
@@ -344,6 +366,8 @@ export interface FileRouteTypes {
     | '/app/settings'
     | '/app/staff'
     | '/app/stock'
+    | '/app/stock_original'
+    | '/app/stock_updated'
     | '/app/suppliers'
     | '/admin/'
     | '/admin/tenants/$tenantId'
@@ -430,6 +454,20 @@ declare module '@tanstack/react-router' {
       path: '/suppliers'
       fullPath: '/app/suppliers'
       preLoaderRoute: typeof AppSuppliersRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/stock_updated': {
+      id: '/app/stock_updated'
+      path: '/stock_updated'
+      fullPath: '/app/stock_updated'
+      preLoaderRoute: typeof AppStock_updatedRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/app/stock_original': {
+      id: '/app/stock_original'
+      path: '/stock_original'
+      fullPath: '/app/stock_original'
+      preLoaderRoute: typeof AppStock_originalRouteImport
       parentRoute: typeof AppRoute
     }
     '/app/stock': {
@@ -598,6 +636,8 @@ interface AppRouteChildren {
   AppSettingsRoute: typeof AppSettingsRoute
   AppStaffRoute: typeof AppStaffRoute
   AppStockRoute: typeof AppStockRoute
+  AppStock_originalRoute: typeof AppStock_originalRoute
+  AppStock_updatedRoute: typeof AppStock_updatedRoute
   AppSuppliersRoute: typeof AppSuppliersRoute
 }
 
@@ -613,6 +653,8 @@ const AppRouteChildren: AppRouteChildren = {
   AppSettingsRoute: AppSettingsRoute,
   AppStaffRoute: AppStaffRoute,
   AppStockRoute: AppStockRoute,
+  AppStock_originalRoute: AppStock_originalRoute,
+  AppStock_updatedRoute: AppStock_updatedRoute,
   AppSuppliersRoute: AppSuppliersRoute,
 }
 

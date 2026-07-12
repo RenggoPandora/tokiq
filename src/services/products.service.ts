@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+﻿/* eslint-disable @typescript-eslint/no-explicit-any */
 import { supabase } from '@/lib/supabase'
 import type {
   Category, Product, ProductWithCategory,
@@ -78,7 +78,8 @@ export const productsService = {
     }
     if (filters?.search) {
       query = query.or(
-        `name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%,barcode.ilike.%${filters.search}%`
+        
+`name.ilike.%${filters.search}%,sku.ilike.%${filters.search}%,barcode.ilike.%${filters.search}%`
       )
     }
 
@@ -104,6 +105,31 @@ export const productsService = {
       .select()
       .single()
     if (error) throw error
+
+    // Fallback: Buat stock record jika trigger belum jalan
+    // (Trigger database seharusnya handle ini otomatis)
+    try {
+      const { data: branches } = await supabase
+        .from('branches')
+        .select('id')
+        .eq('tenant_id', dto.tenant_id)
+
+      if (branches && branches.length > 0) {
+        const stockRecords = branches.map((b) => ({
+          tenant_id: dto.tenant_id,
+          product_id: data.id,
+          branch_id: b.id,
+          quantity: 0,
+          min_stock: 5,
+        }))
+
+        await db.from('stocks').insert(stockRecords)
+      }
+    } catch (stockErr) {
+      // Jangan fail create product kalau stock insert gagal
+      console.warn('Failed to create initial stock records:', stockErr)
+    }
+
     return data as Product
   },
 

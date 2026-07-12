@@ -1,4 +1,4 @@
-import { useAuth } from '@/contexts/auth.context'
+﻿import { useAuth } from '@/contexts/auth.context'
 import { TENANT_ROLES } from '@/lib/constants'
 
 // Daftar permission keys yang tersedia
@@ -50,6 +50,7 @@ const ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
     'suppliers.manage',
     'reports.view',
     'reports.export',
+    'staff.manage',
   ],
   [TENANT_ROLES.CASHIER]: [
     'pos.access',

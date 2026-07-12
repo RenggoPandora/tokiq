@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+﻿import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { stockService, supplierService } from '@/services/stock.service'
 import { useTenant } from '@/hooks/use-tenant'
@@ -6,7 +6,7 @@ import type { Supplier } from '@/types/app.types'
 
 export const stockKeys = {
   all: ['stocks'] as const,
-  list: (tenantId: string) => [...stockKeys.all, tenantId] as const,
+  list: (tenantId: string, branchId?: string | null) => [...stockKeys.all, tenantId, branchId] as const,
   low: (tenantId: string) => [...stockKeys.all, 'low', tenantId] as const,
   movements: (tenantId: string, productId?: string) =>
     [...stockKeys.all, 'movements', tenantId, productId] as const,
@@ -21,11 +21,11 @@ export const supplierKeys = {
 // STOCK
 // ===========================
 
-export function useStock(branchId?: string) {
-  const { tenantId } = useTenant()
+export function useStock() {
+  const { tenantId, branchId } = useTenant()
   return useQuery({
-    queryKey: stockKeys.list(tenantId),
-    queryFn: () => stockService.getAll(tenantId, branchId),
+    queryKey: stockKeys.list(tenantId, branchId),
+    queryFn: () => stockService.getAll(tenantId, branchId ?? undefined),
     staleTime: 2 * 60 * 1000,
   })
 }
@@ -50,18 +50,18 @@ export function useStockMovements(productId?: string) {
 
 export function useAdjustStock() {
   const queryClient = useQueryClient()
-  const { tenantId, tenantUser } = useTenant()
+  const { tenantId, tenantUser, branchId } = useTenant()
   return useMutation({
     mutationFn: ({
-      productId, branchId, newQty, reason,
+      productId, branchId: targetBranchId, newQty, reason,
     }: {
       productId: string
       branchId: string
       newQty: number
       reason: string
-    }) => stockService.adjust(tenantId, productId, branchId, newQty, reason, tenantUser.id),
+    }) => stockService.adjust(tenantId, productId, targetBranchId, newQty, reason, tenantUser.id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: stockKeys.list(tenantId) })
+      queryClient.invalidateQueries({ queryKey: stockKeys.list(tenantId, branchId) })
       queryClient.invalidateQueries({ queryKey: stockKeys.low(tenantId) })
       toast.success('Stok berhasil diperbarui')
     },

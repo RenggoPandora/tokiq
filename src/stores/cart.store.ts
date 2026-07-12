@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+﻿import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CartAddon, CartItem } from '@/types/app.types'
 
@@ -16,11 +16,12 @@ interface CartStore {
   setTaxRate: (rate: number) => void
   setNotes: (notes: string) => void
   clearCart: () => void
-  readonly subtotal: number
-  readonly discountAmount: number
-  readonly taxAmount: number
-  readonly total: number
-  readonly itemCount: number
+  // Computed values as selector functions
+  subtotal: () => number
+  discountAmount: () => number
+  taxAmount: () => number
+  total: () => number
+  itemCount: () => number
 }
 
 function getItemKey(productId: string, variantId?: string) {
@@ -111,28 +112,34 @@ export const useCartStore = create<CartStore>()(
       setNotes: (notes) => set({ notes }),
       clearCart: () => set({ items: [], discount: 0, notes: '' }),
 
-      get subtotal() {
+      // Computed values as functions
+      subtotal: () => {
         return get().items.reduce((sum, item) => {
           const addonTotal = item.addons.reduce((a, addon) => a + addon.price, 0)
           return sum + (item.price + addonTotal) * item.quantity
         }, 0)
       },
 
-      get discountAmount() {
+      discountAmount: () => {
         return get().discount
       },
 
-      get taxAmount() {
-        const { subtotal, discount, taxRate } = get()
-        return Math.round((subtotal - discount) * taxRate)
+      taxAmount: () => {
+        const state = get()
+        const sub = state.subtotal()
+        const disc = state.discount
+        return Math.round((sub - disc) * state.taxRate)
       },
 
-      get total() {
-        const { subtotal, discount, taxAmount } = get()
-        return subtotal - discount + taxAmount
+      total: () => {
+        const state = get()
+        const sub = state.subtotal()
+        const disc = state.discount
+        const tax = state.taxAmount()
+        return sub - disc + tax
       },
 
-      get itemCount() {
+      itemCount: () => {
         return get().items.reduce((sum, item) => sum + item.quantity, 0)
       },
     }),
@@ -147,3 +154,33 @@ export const useCartStore = create<CartStore>()(
     }
   )
 )
+
+// Selector hooks untuk reactive computed values
+export function useCartSubtotal() {
+  return useCartStore((state) => 
+    state.items.reduce((sum, item) => {
+      const addonTotal = item.addons.reduce((a, addon) => a + addon.price, 0)
+      return sum + (item.price + addonTotal) * item.quantity
+    }, 0)
+  )
+}
+
+export function useCartTotal() {
+  const items = useCartStore((state) => state.items)
+  const discount = useCartStore((state) => state.discount)
+  const taxRate = useCartStore((state) => state.taxRate)
+  
+  const subtotal = items.reduce((sum, item) => {
+    const addonTotal = item.addons.reduce((a, addon) => a + addon.price, 0)
+    return sum + (item.price + addonTotal) * item.quantity
+  }, 0)
+  
+  const taxAmount = Math.round((subtotal - discount) * taxRate)
+  return subtotal - discount + taxAmount
+}
+
+export function useCartItemCount() {
+  return useCartStore((state) => 
+    state.items.reduce((sum, item) => sum + item.quantity, 0)
+  )
+}
